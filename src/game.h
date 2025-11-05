@@ -8,7 +8,7 @@
 #define SWIDTH 700
 #define SHEIGHT 700
 
-void game_init (int argc, char *argv[]);
+void game_init (int argc, std::string argv[]);
 void game_display ();
 void game_keyboard (unsigned char key, int x, int y);
 void game_idle ();

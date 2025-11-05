@@ -5,7 +5,7 @@
 
 #define HOSTPORT 1337
 
-int init_client(char *hostname);
+int init_client(const char *hostname);
 int init_server(void);
 int accept_or_die(int rq_sock);
 

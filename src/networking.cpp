@@ -82,7 +82,7 @@ int accept_or_die(int request_sd) {
 	return res;
 }
 
-int init_client(char *hostname) {
+int init_client(const char *hostname) {
 	int sd;
 	sd = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
 

@@ -2,6 +2,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <iostream>
+#include <string>
 
 #ifdef _WIN32
 #include <winsock2.h>
@@ -61,7 +62,7 @@ void draw_board() {
 	}
 }
 
-void game_init (int argc, char *argv[])
+void game_init (int argc, std::string argv[])
 {
 	mainmenu = glutCreateMenu(right_menu);
 	glutAddMenuEntry("Connect", 1);
@@ -96,6 +97,7 @@ void game_init (int argc, char *argv[])
 #endif
 
 	if (argc < 2){
+		printf("Hosting...\n");
 		player = 0;
 		rq_sock = init_server();
 		std::cerr << rq_sock;
@@ -103,12 +105,13 @@ void game_init (int argc, char *argv[])
 		glutSetWindowTitle ("Go - Server");
 	}
 	else if (argc == 2){
+		printf("Connecting...\n");
 		player = 1;
-		sock = init_client(argv[1]);
+		sock = init_client(argv[1].data());
 		glutSetWindowTitle ("Go - Client");
 	}
 	else {
-		printf ("Usage: %s [ip]\n", argv[0]);
+		printf ("Usage: %s [ip]\n", argv[0].data());
 		exit (EXIT_FAILURE);
 	}
 
