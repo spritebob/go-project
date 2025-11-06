@@ -31,7 +31,7 @@ int mainmenu;
 Mesh mesh;
 
 bool place_stone(int x, int y, int side);
-bool check_freedoms(int x, int y, int side);
+bool check_liberties(int x, int y, int side);
 int handle_flags(bool removePiece);
 void right_menu(int element);
 
@@ -247,14 +247,14 @@ bool place_stone(int x, int y, int side){
 	for (int i = 0; i < 4; i++) {
 		nx = x+(i==1)-(i==0);
 		ny = y+(i==3)-(i==2);
-		cf = check_freedoms(nx, ny, 3-side);
+		cf = check_liberties(nx, ny, 3-side);
 		hremove += !cf*handle_flags(!cf);
 		if (hremove == 1 && removedX == -1) {
 			removedX = nx;
 			removedY = ny;
 		}
 	}
-	cf = check_freedoms(x, y, side);
+	cf = check_liberties(x, y, side);
 	int tmp = handle_flags(!cf);
 	if (tmp > 1 || hremove != 1) {
 		removedX = -1;
@@ -281,7 +281,7 @@ int handle_flags(bool removePiece){
 	return r;
 }
 
-bool check_freedoms(int x, int y, int side) {
+bool check_liberties(int x, int y, int side) {
 	if (x < 0 || x >= xfields || y < 0 || y >= yfields) { 
 		return false;
 	}
@@ -295,7 +295,7 @@ bool check_freedoms(int x, int y, int side) {
 		for (int i = 0; i < 4; i++) {
 			nx = x+(i==1)-(i==0);
 			ny = y+(i==3)-(i==2);
-			if (check_freedoms(nx, ny, side)) {
+			if (check_liberties(nx, ny, side)) {
 				return true;
 			}
 		}
