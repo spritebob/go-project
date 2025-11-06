@@ -18,4 +18,4 @@ Now install the following packages:
 ./vcpkg.exe integrate install
 ```
 
-The project should now be able to compile and run in Visual Studio 2019.
+The project should now be ready to compile and run in Visual Studio 2019!
