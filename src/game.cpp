@@ -27,6 +27,7 @@ int xfields, yfields, rq_sock, sock;
 int player, turn;
 double dx, dy;
 int mainmenu;
+bool online = true;
 
 Mesh mesh;
 
@@ -96,7 +97,11 @@ void game_init (int argc, std::string argv[])
 		wglGetProcAddress ("glBufferData");
 #endif
 
-	if (argc < 2){
+	if (argc == 0) {
+		printf("Playing hotseat\n");
+		online = false;
+	}
+	else if (argc == 1){
 		printf("Hosting...\n");
 		player = 0;
 		rq_sock = init_server();
@@ -115,8 +120,9 @@ void game_init (int argc, std::string argv[])
 		exit (EXIT_FAILURE);
 	}
 
-	printf("Socket: %d\n", sock);
-	mesh.load("triangle.obj");
+	if (online)
+		printf("Socket: %d\n", sock);
+
 	mesh.load("stone.obj");
 
 }
@@ -172,13 +178,15 @@ void right_menu(int element) {
 }
 
 void game_idle() {
+	if (!online)
+		return;
 	sPlayerAction action;
 	get_command(sock, &action);
 	switch (action.command) {
 		case CmdPut:
-			turn = !turn;
-			board[action.y][action.x] = (!player)+1;
-			place_stone(action.x, action.y, (!player)+1);
+			turn = 1 - turn;
+			board[action.y][action.x] = 2 - player;
+			place_stone(action.x, action.y, 2 - player);
 			glutPostRedisplay();
 			break;
 		case CmdRemove:
@@ -191,7 +199,7 @@ void game_idle() {
 }
 
 void game_mouse(int b, int z, int x, int y) {
-	if(!z || turn != player) {
+	if(!z || (online && turn != player)) {
 		return;
 	}
 
@@ -211,16 +219,17 @@ void game_mouse(int b, int z, int x, int y) {
 				if (board[iY][iX] != 0) {
 					return;
 				}
-				board[iY][iX] = player+1;
-				if (place_stone(iX, iY, player+1)) {
+				board[iY][iX] = turn + 1;
+				if (place_stone(iX, iY, turn+1)) {
 					board[iY][iX] = 0;
 					return;
 				}
 				action.command = CmdPut;
 				action.x = iX;
 				action.y = iY;
-				turn = !turn;
-				send_command(sock, action);
+				turn = 1 - turn;
+				if (online)
+					send_command(sock, action);
 				break;
 
 			case GLUT_RIGHT_BUTTON:
@@ -229,7 +238,8 @@ void game_mouse(int b, int z, int x, int y) {
 				action.command = CmdRemove;
 				action.x = iX;
 				action.y = iY;
-				send_command(sock, action);
+				if (online)
+					send_command(sock, action);
 				break;
 		}
 		glutPostRedisplay();

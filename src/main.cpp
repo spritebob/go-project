@@ -1,3 +1,4 @@
+#include <conio.h>
 #include <iostream>
 #include <string>
 
@@ -11,14 +12,15 @@ void init_gl() {
 
 int main(int argc, char **argv) {
 	glutInit(&argc, argv);
-	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB);
-	glutInitWindowSize(SWIDTH,SHEIGHT);
-	glutCreateWindow("Go");
-	glutDisplayFunc(game_display);
-	glutMouseFunc(game_mouse);
-	glutKeyboardFunc(game_keyboard);
-	glutIdleFunc(game_idle);
-	
+
+	std::cout << "Play online (y/n)? ";
+	char c;
+	do {
+		c = getch();
+	} while (c != 'y' && c != 'n');
+	std::cout << c << std::endl;
+	if (c == 'n') argc = 0;
+
 	std::string args[2];
 	args[0] = argv[0];
 	if (argc == 1) {
@@ -27,9 +29,18 @@ int main(int argc, char **argv) {
 		if (!args[1].empty())
 			argc++;
 	}
-	else {
+	else if (argc == 2) {
 		args[1] = argv[1];
 	}
+
+	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB);
+	glutInitWindowSize(SWIDTH,SHEIGHT);
+	glutCreateWindow("Go");
+	glutDisplayFunc(game_display);
+	glutMouseFunc(game_mouse);
+	glutKeyboardFunc(game_keyboard);
+	glutIdleFunc(game_idle);
+
 	init_gl();
 	game_init (argc, args);
 
