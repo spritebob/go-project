@@ -1,5 +1,3 @@
-# go-project
-
 Setup with vcpkg:
 ===
 If you don't already have vcpkg, clone the repository from here: https://github.com/microsoft/vcpkg
