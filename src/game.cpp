@@ -20,7 +20,7 @@ PFNGLBUFFERDATAPROC glBufferData;
 #include "game.h"
 #include "mesh.h"
 
-#define LWIDTH 0.008
+#define LWIDTH 0.002
 
 int **board;
 int xfields, yfields, rq_sock, sock;
@@ -39,7 +39,7 @@ void right_menu(int element);
 void draw_board() {
 	int i;
 	glBegin(GL_POLYGON);
-	glColor3f(0.8,0.8,0.5); 
+	glColor3f(1.0,0.7,0.2);
 	glVertex3f(-1, -1, 0);
 	glVertex3f(-1, 1, 0);
 	glVertex3f(1, 1, 0);
@@ -47,14 +47,14 @@ void draw_board() {
 	glEnd();
 	for (i = 0; i < xfields; i++) {
 		glBegin(GL_POLYGON);
-		glColor3f(0.5,0.0,0.0); 
+		glColor3f(0.1, 0.1, 0.1);
 		glVertex3f(0.9+LWIDTH, -0.9-LWIDTH+i*dy, 0);
 		glVertex3f(0.9+LWIDTH, -0.9+LWIDTH+i*dy, 0);
 		glVertex3f(-0.9-LWIDTH, -0.9+LWIDTH+i*dy, 0);
 		glVertex3f(-0.9-LWIDTH, -0.9-LWIDTH+i*dy, 0);
 		glEnd();
 		glBegin(GL_POLYGON);
-		glColor3f(0.5,0.0,0.0); 
+		glColor3f(0.1, 0.1, 0.1);
 		glVertex3f(-0.9-LWIDTH+i*dx, 0.9, 0);
 		glVertex3f(-0.9+LWIDTH+i*dx, 0.9, 0);
 		glVertex3f(-0.9+LWIDTH+i*dx, -0.9, 0);
@@ -131,7 +131,7 @@ void set_board_position(int x,int y)
 {
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
-	glTranslatef(-0.9+LWIDTH+x*dx, -0.9+LWIDTH+y*dy, 0);
+	glTranslatef(-0.9+x*dx, -0.9+y*dy, 0);
 }
 
 void game_display() {
@@ -153,7 +153,7 @@ void game_display() {
 		for(int y=0; y<yfields; y++) {
 			if(board[y][x]) {
 				static float cols[] =
-				{0,0,0, 1,1,1};
+				{0,0,0, 0.98,0.98,0.98};
 
 				set_board_position(x,y);
 				int bval = board[y][x]-1;
