@@ -117,6 +117,7 @@ void game_init (int argc, std::string argv[])
 
 	printf("Socket: %d\n", sock);
 	mesh.load("triangle.obj");
+	mesh.load("stone.obj");
 
 }
 
