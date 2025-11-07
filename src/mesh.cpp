@@ -91,15 +91,16 @@ void Mesh::load(const char* filename)
 	nIndex = faces.size();
 }
 
-void Mesh::render(float r, float g, float b)
+void Mesh::render(float r, float g, float b, float a)
 {
 	glBindBuffer( GL_ARRAY_BUFFER, vbo);
 	glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, ebo);
 	
 	glEnableClientState(GL_VERTEX_ARRAY);
-	
-	glColor3f(r,g,b);
-	glVertexPointer(3, 	GL_FLOAT, 0,0);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glColor4f(r, g, b, a);
+	glVertexPointer(3, 	GL_FLOAT, 0, 0);
 	glDrawElements( GL_TRIANGLES, nIndex, GL_UNSIGNED_SHORT, 0);
 	
 	glDisableClientState(GL_VERTEX_ARRAY);

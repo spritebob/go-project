@@ -37,15 +37,6 @@ bool check_liberties(int x, int y, int side);
 int handle_flags(bool removePiece);
 void right_menu(int element);
 
-struct Colour {
-	Colour(float r, float g, float b)
-		: r(r), g(g), b(b)
-	{ ; }
-	float r, g, b;
-};
-
-Colour boardColour(1.0, 0.7, 0.2);
-Colour lineColour(0.1, 0.1, 0.1);
 
 void glRectangle(const Colour & c, float x0, float y0, float x1, float y1) {
 	glBegin(GL_POLYGON);
