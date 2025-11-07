@@ -21,6 +21,7 @@ PFNGLBUFFERDATAPROC glBufferData;
 #include "mesh.h"
 
 #define LWIDTH 0.002
+#define STARW 0.008
 
 int **board;
 int xfields, yfields, rq_sock, sock;
@@ -36,38 +37,43 @@ bool check_liberties(int x, int y, int side);
 int handle_flags(bool removePiece);
 void right_menu(int element);
 
+struct Colour {
+	Colour(float r, float g, float b)
+		: r(r), g(g), b(b)
+	{ ; }
+	float r, g, b;
+};
+
+Colour boardColour(1.0, 0.7, 0.2);
+Colour lineColour(0.1, 0.1, 0.1);
+
+void glRectangle(const Colour & c, float x0, float y0, float x1, float y1) {
+	glBegin(GL_POLYGON);
+	glColor3f(c.r, c.g, c.b);
+	glVertex3f(x0, y0, 0);
+	glVertex3f(x0, y1, 0);
+	glVertex3f(x1, y1, 0);
+	glVertex3f(x1, y0, 0);
+	glEnd();
+}
+
 void draw_board() {
 	int i;
-	glBegin(GL_POLYGON);
-	glColor3f(1.0,0.7,0.2);
-	glVertex3f(-1, -1, 0);
-	glVertex3f(-1, 1, 0);
-	glVertex3f(1, 1, 0);
-	glVertex3f(1, -1, 0);
-	glEnd();
+	glRectangle(boardColour, -1, -1, 1, 1);
 	for (i = 0; i < xfields; i++) {
-		glBegin(GL_POLYGON);
-		glColor3f(0.1, 0.1, 0.1);
-		glVertex3f(0.9+LWIDTH, -0.9-LWIDTH+i*dy, 0);
-		glVertex3f(0.9+LWIDTH, -0.9+LWIDTH+i*dy, 0);
-		glVertex3f(-0.9-LWIDTH, -0.9+LWIDTH+i*dy, 0);
-		glVertex3f(-0.9-LWIDTH, -0.9-LWIDTH+i*dy, 0);
-		glEnd();
-		glBegin(GL_POLYGON);
-		glColor3f(0.1, 0.1, 0.1);
-		glVertex3f(-0.9-LWIDTH+i*dx, 0.9, 0);
-		glVertex3f(-0.9+LWIDTH+i*dx, 0.9, 0);
-		glVertex3f(-0.9+LWIDTH+i*dx, -0.9, 0);
-		glVertex3f(-0.9-LWIDTH+i*dx, -0.9, 0);
-		glEnd();
+		glRectangle(lineColour, -0.9-LWIDTH, -0.9-LWIDTH+i*dy, 0.9+LWIDTH, -0.9+LWIDTH+i*dy);
+		glRectangle(lineColour, -0.9-LWIDTH+i*dx, -0.9-LWIDTH, -0.9+LWIDTH+i*dx, 0.9+LWIDTH);
+	}
+	for (int x = 3; x < xfields; x += 6) {
+		for (int y = 3; y < xfields; y += 6) {
+			glRectangle(lineColour, -0.9-STARW+x*dx, -0.9-STARW+y*dy, -0.9+STARW+x*dx, -0.9+STARW+y*dy);
+		}
 	}
 }
 
 void game_init (int argc, std::string argv[])
 {
 	mainmenu = glutCreateMenu(right_menu);
-	glutAddMenuEntry("Connect", 1);
-	glutAttachMenu(GLUT_RIGHT_BUTTON);
 	player = turn = 0;
 	xfields = yfields = 19;
 	dx = 1.8/(xfields-1);
