@@ -15,6 +15,7 @@ PFNGLBUFFERDATAPROC glBufferData;
 #endif
 
 
+#include "colour.h"
 #include "networking.h"
 
 #include "game.h"
@@ -29,14 +30,19 @@ int player, turn;
 double dx, dy;
 int mainmenu;
 bool online = true;
+int previewX, previewY;
 
 Mesh mesh;
+TurnSequence turnSequence;
 
-bool place_stone(int x, int y, int side);
+bool place_stone(int x, int y, int side, bool dryRun = false);
 bool check_liberties(int x, int y, int side);
 int handle_flags(bool removePiece);
+bool is_legal_move(int x, int y);
+bool preview_stone(int x, int y);
 void right_menu(int element);
-
+void next_turn();
+void reset_turn();
 
 void glRectangle(const Colour & c, float x0, float y0, float x1, float y1) {
 	glBegin(GL_POLYGON);
@@ -121,7 +127,7 @@ void game_init (int argc, std::string argv[])
 		printf("Socket: %d\n", sock);
 
 	mesh.load("stone.obj");
-
+	reset_turn();
 }
 
 void set_board_position(int x,int y)
@@ -129,6 +135,19 @@ void set_board_position(int x,int y)
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
 	glTranslatef(-0.9+x*dx, -0.9+y*dy, 0);
+}
+
+void render_preview() {
+	if (previewX >= 0) {
+		set_board_position(previewX, previewY);
+		Colour & c = turnSequence.nextStoneColour ? whiteColour : blackColour;
+		mesh.render(c.r, c.g, c.b, 0.4);
+	}
+	for (Move & move : turnSequence.stonesPlayed) {
+		set_board_position(move.x, move.y);
+		Colour & c = move.stoneColour ? whiteColour : blackColour;
+		mesh.render(c.r, c.g, c.b, 0.4);
+	}
 }
 
 void game_display() {
@@ -145,16 +164,15 @@ void game_display() {
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
 	draw_board();
+	render_preview();
 
 	for(int x=0; x<xfields; x++)
 		for(int y=0; y<yfields; y++) {
 			if(board[y][x]) {
-				static float cols[] =
-				{0,0,0, 0.98,0.98,0.98};
-
 				set_board_position(x,y);
 				int bval = board[y][x]-1;
-				mesh.render(cols[bval*3], cols[bval*3+1], cols[bval*3+2]);
+				Colour & c = bval ? whiteColour : blackColour;
+				mesh.render(c.r, c.g, c.b);
 			}
 		}
 	glutSwapBuffers();
@@ -181,9 +199,9 @@ void game_idle() {
 	get_command(sock, &action);
 	switch (action.command) {
 		case CmdPut:
-			turn = 1 - turn;
 			board[action.y][action.x] = 2 - player;
 			place_stone(action.x, action.y, 2 - player);
+			next_turn();
 			glutPostRedisplay();
 			break;
 		case CmdRemove:
@@ -196,15 +214,20 @@ void game_idle() {
 }
 
 void game_mouse(int b, int z, int x, int y) {
-	if(!z || (online && turn != player)) {
+	if(!z || (online && turn != player) || previewX < 0) {
 		return;
 	}
 
 	double xd = (double(x)/SWIDTH - 0.5)*2.0 + 0.9;
 	double yd = (double(y)/SHEIGHT - 0.5)*2.0 + 0.9;
 
-	int iX = xd/1.8*18.0 +0.5;
-	int iY = yd/1.8*18.0 +0.5;
+	int iX = int(xd * 10.0 + 1.5) - 1;
+	int iY = int(yd * 10.0 + 1.5) - 1;
+	if (iX != previewX || iY != previewY) {
+		preview_stone(iX, iY);
+		glutPostRedisplay();
+		return;
+	}
 
 	sPlayerAction action;
 
@@ -224,7 +247,7 @@ void game_mouse(int b, int z, int x, int y) {
 				action.command = CmdPut;
 				action.x = iX;
 				action.y = iY;
-				turn = 1 - turn;
+				next_turn();
 				if (online)
 					send_command(sock, action);
 				break;
@@ -243,7 +266,67 @@ void game_mouse(int b, int z, int x, int y) {
 	}
 }
 
-bool place_stone(int x, int y, int side){
+void game_mouse_move(int x, int y) {
+	if (online && turn != player) {
+		return;
+	}
+
+	double xd = (double(x) / SWIDTH - 0.5) * 2.0 + 0.9;
+	double yd = (double(y) / SHEIGHT - 0.5) * 2.0 + 0.9;
+
+	int iX = int(xd * 10.0 + 1.5) - 1;
+	int iY = int(yd * 10.0 + 1.5) - 1;
+	if (preview_stone(iX, iY))
+		glutPostRedisplay();
+}
+
+void next_turn() {
+	turn = 1 - turn;
+	turnSequence.nextStoneColour = turn;
+	turnSequence.stonesPlayed.clear();
+	previewX = -1;
+	previewY = -1;
+}
+
+void reset_turn() {
+	turn = 1;
+	next_turn();
+}
+
+bool preview_stone(int x, int y) {
+	if (x < xfields && y < yfields && x >= 0 && y >= 0) {
+		if (!is_legal_move(x, y)) {
+			x = -1;
+			y = -1;
+		}
+	} else {
+		x = -1;
+		y = -1;
+	}
+
+	if (x != previewX || y != previewY) {
+		previewX = x;
+		previewY = y;
+		return true;
+	}
+	return false;
+}
+
+bool is_legal_move(int x, int y) {
+	for (Move & move : turnSequence.stonesPlayed) {
+		board[move.y][move.x] = move.stoneColour;
+	}
+
+	bool isLegal = !place_stone(x, y, turnSequence.nextStoneColour, true);
+
+	for (Move & move : turnSequence.stonesPlayed) {
+		board[move.y][move.x] = 0;
+	}
+
+	return isLegal;
+}
+
+bool place_stone(int x, int y, int side, bool dryRun){
 	int nx, ny;
 	static int removedX = -1, removedY = -1;
 	//fprintf(stderr, "%d %d %d %d", removedX, removedY, x, y);
@@ -256,15 +339,15 @@ bool place_stone(int x, int y, int side){
 		nx = x+(i==1)-(i==0);
 		ny = y+(i==3)-(i==2);
 		cf = check_liberties(nx, ny, 3-side);
-		hremove += !cf*handle_flags(!cf);
-		if (hremove == 1 && removedX == -1) {
+		hremove += !cf*handle_flags(!dryRun && !cf);
+		if (!dryRun && hremove == 1 && removedX == -1) {
 			removedX = nx;
 			removedY = ny;
 		}
 	}
 	cf = check_liberties(x, y, side);
 	int tmp = handle_flags(!cf);
-	if (tmp > 1 || hremove != 1) {
+	if (!dryRun && (tmp > 1 || hremove != 1)) {
 		removedX = -1;
 		removedY = -1;
 	}
