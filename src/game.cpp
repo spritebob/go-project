@@ -43,6 +43,7 @@ bool preview_stone(int x, int y);
 void right_menu(int element);
 void next_turn();
 void reset_turn();
+std::pair<int, int> screen_to_board_coordinates(int sx, int sy);
 
 void glRectangle(const Colour & c, float x0, float y0, float x1, float y1) {
 	glBegin(GL_POLYGON);
@@ -128,6 +129,13 @@ void game_init (int argc, std::string argv[])
 
 	mesh.load("stone.obj");
 	reset_turn();
+}
+
+std::pair<int, int> screen_to_board_coordinates(int sx, int sy) {
+	double xd = (double(sx) / SWIDTH - 0.5) * 2.0 + 0.9;
+	double yd = (double(sy) / SHEIGHT - 0.5) * 2.0 + 0.9;
+
+	return std::pair<int, int>(int(xd * 10.0 + 1.5) - 1, int(yd * 10.0 + 1.5) - 1);
 }
 
 void set_board_position(int x,int y)
@@ -218,11 +226,8 @@ void game_mouse(int b, int z, int x, int y) {
 		return;
 	}
 
-	double xd = (double(x)/SWIDTH - 0.5)*2.0 + 0.9;
-	double yd = (double(y)/SHEIGHT - 0.5)*2.0 + 0.9;
+	auto [iX, iY] = screen_to_board_coordinates(x, y);
 
-	int iX = int(xd * 10.0 + 1.5) - 1;
-	int iY = int(yd * 10.0 + 1.5) - 1;
 	if (iX != previewX || iY != previewY) {
 		preview_stone(iX, iY);
 		glutPostRedisplay();
@@ -271,15 +276,19 @@ void game_mouse_move(int x, int y) {
 		return;
 	}
 
-	double xd = (double(x) / SWIDTH - 0.5) * 2.0 + 0.9;
-	double yd = (double(y) / SHEIGHT - 0.5) * 2.0 + 0.9;
+	auto [iX, iY] = screen_to_board_coordinates(x, y);
 
-	int iX = int(xd * 10.0 + 1.5) - 1;
-	int iY = int(yd * 10.0 + 1.5) - 1;
 	if (preview_stone(iX, iY))
 		glutPostRedisplay();
 }
 
+void game_mouse_click_move(int x, int y) {
+	auto [iX, iY] = screen_to_board_coordinates(x, y);
+	if (iX != previewX || iY != previewY) {
+		previewX = -1;
+		previewY = -1;
+		glutPostRedisplay();
+	}
 void next_turn() {
 	turn = 1 - turn;
 	turnSequence.nextStoneColour = turn;

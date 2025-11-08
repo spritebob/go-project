@@ -39,6 +39,7 @@ int main(int argc, char **argv) {
 	glutDisplayFunc(game_display);
 	glutMouseFunc(game_mouse);
 	glutPassiveMotionFunc(game_mouse_move);
+	glutMotionFunc(game_mouse_click_move);
 	glutKeyboardFunc(game_keyboard);
 	glutIdleFunc(game_idle);
 

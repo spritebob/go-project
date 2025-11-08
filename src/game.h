@@ -17,6 +17,7 @@ void game_keyboard (unsigned char key, int x, int y);
 void game_idle ();
 void game_mouse (int b, int z, int x, int y);
 void game_mouse_move(int x, int y);
+void game_mouse_click_move(int x, int y);
 
 enum Command {CmdNothing=0, CmdPut, CmdRemove};
 
