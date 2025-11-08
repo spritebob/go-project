@@ -5,8 +5,8 @@
 #ifndef _GAME_H
 #define _GAME_H
 
-#define SWIDTH 700
-#define SHEIGHT 700
+#define SWIDTH 823
+#define SHEIGHT 823
 
 #include <vector>
 
