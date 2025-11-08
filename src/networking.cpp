@@ -105,11 +105,18 @@ int init_client(const char *hostname) {
 
 void get_command(int sfd, sPlayerAction *action) {
 	char buf[1024];
-	int res = recv(sfd, buf, 12, 0);
+	int res = recv(sfd, buf, 32, 0);
 	if (res > 0){
-		action->command = (Command) ntohl(*(int*)&buf[0]);
-		action->x = ntohl(*(int*)&buf[4]);
-		action->y = ntohl(*(int*)&buf[8]);
+		int * buf_ptr = (int *)&buf[0];
+		action->command = (Command) ntohl(*buf_ptr++);
+		int size = ntohl(*buf_ptr++);
+		int x, y, c;
+		for (int i = 0; i < size; i++) {
+			x = ntohl(*buf_ptr++);
+			y = ntohl(*buf_ptr++);
+			c = ntohl(*buf_ptr++);
+			action->moves.emplace_back(x, y, c);
+		}
 	} else {
 		action->command = CmdNothing;
 	}
@@ -117,10 +124,15 @@ void get_command(int sfd, sPlayerAction *action) {
 
 void send_command(int sfd, const sPlayerAction& action){
 	char buf[1024];
-	*(int*)&buf[0] = htonl((int)action.command);
-	*(int*)&buf[4] = htonl(action.x);
-	*(int*)&buf[8] = htonl(action.y);
-	int res = send(sfd, buf, 12, 0);
+	int * buf_ptr = (int *)&buf[0];
+	*buf_ptr++ = htonl((int)action.command);
+	*buf_ptr++ = htonl((int)action.moves.size());
+	for (const Move & move : action.moves) {
+		*buf_ptr++ = htonl(move.x);
+		*buf_ptr++ = htonl(move.y);
+		*buf_ptr++ = htonl(move.stoneColour);
+	}
+	int res = send(sfd, buf, 32, 0);
 	if (res < 0) {
 		socket_error("send_command()");
 	}

@@ -27,6 +27,8 @@ PFNGLBUFFERDATAPROC glBufferData;
 int **board;
 int xfields, yfields, rq_sock, sock;
 int player, turn;
+int caps[] = { 0, 0 };
+int passCount = 0;
 double dx, dy;
 int mainmenu;
 bool online = true;
@@ -38,9 +40,14 @@ TurnSequence turnSequence;
 bool place_stone(int x, int y, int side, bool dryRun = false);
 bool check_liberties(int x, int y, int side);
 int handle_flags(bool removePiece);
+bool captured_pending_stone();
 bool is_legal_move(int x, int y);
+bool has_open_neighbour(int x, int y);
+bool has_friendly_neighbour(int x, int y);
+bool adjacent(int x0, int y0, int x1, int y1);
 bool preview_stone(int x, int y);
 void right_menu(int element);
+void display_caps();
 void next_turn();
 void reset_turn();
 std::pair<int, int> screen_to_board_coordinates(int sx, int sy);
@@ -207,14 +214,16 @@ void game_idle() {
 	get_command(sock, &action);
 	switch (action.command) {
 		case CmdPut:
-			board[action.y][action.x] = 2 - player;
-			place_stone(action.x, action.y, 2 - player);
+			for (Move & move : action.moves) {
+				board[move.y][move.x] = move.stoneColour + 1;
+				place_stone(move.x, move.y, move.stoneColour);
+			}
 			next_turn();
 			glutPostRedisplay();
 			break;
-		case CmdRemove:
-			board[action.y][action.x] = 0;
-			glutPostRedisplay();
+		case CmdPass:
+			std::cout << "Pass" << std::endl;
+			passCount++;
 			break;
 		default:
 			break;
@@ -222,49 +231,46 @@ void game_idle() {
 }
 
 void game_mouse(int b, int z, int x, int y) {
-	if(!z || (online && turn != player) || previewX < 0) {
+	if(!z || (online && turn != player))
 		return;
-	}
 
 	auto [iX, iY] = screen_to_board_coordinates(x, y);
 
-	if (iX != previewX || iY != previewY) {
-		preview_stone(iX, iY);
-		glutPostRedisplay();
-		return;
-	}
-
-	sPlayerAction action;
-
-	//printf("%g %g\n", xd,yd);
 	if(iX < xfields && iY < yfields && iX>=0 && iY>=0) {
 		switch(b)
 		{
 			case GLUT_LEFT_BUTTON:
-				if (board[iY][iX] != 0) {
+				if (iX != previewX || iY != previewY) {
+					preview_stone(iX, iY);
+					glutPostRedisplay();
 					return;
 				}
-				board[iY][iX] = turn + 1;
-				if (place_stone(iX, iY, turn+1)) {
-					board[iY][iX] = 0;
-					return;
+
+				turnSequence.instertStone(iX, iY);
+				previewX = -1;
+				previewY = -1;
+				if (turnSequence.stonesPlayed.size() < turnSequence.stonesToPlay && has_open_neighbour(iX, iY))
+					break;
+
+				for (Move & move : turnSequence.stonesPlayed) {
+					board[move.y][move.x] = move.stoneColour + 1;
+					place_stone(move.x, move.y, move.stoneColour);
 				}
-				action.command = CmdPut;
-				action.x = iX;
-				action.y = iY;
-				next_turn();
-				if (online)
+
+				if (online) {
+					sPlayerAction action;
+					action.command = CmdPut;
+					action.moves = turnSequence.stonesPlayed;
 					send_command(sock, action);
+				}
+				next_turn();
 				break;
 
 			case GLUT_RIGHT_BUTTON:
-				break;
-				board[iY][iX] = 0;
-				action.command = CmdRemove;
-				action.x = iX;
-				action.y = iY;
-				if (online)
-					send_command(sock, action);
+				if (turnSequence.stonesPlayed.empty())
+					return;
+				turnSequence.stonesPlayed.clear();
+				turnSequence.nextStoneColour = turn;
 				break;
 		}
 		glutPostRedisplay();
@@ -289,24 +295,15 @@ void game_mouse_click_move(int x, int y) {
 		previewY = -1;
 		glutPostRedisplay();
 	}
-void next_turn() {
-	turn = 1 - turn;
-	turnSequence.nextStoneColour = turn;
-	turnSequence.stonesPlayed.clear();
-	previewX = -1;
-	previewY = -1;
-}
-
-void reset_turn() {
-	turn = 1;
-	next_turn();
 }
 
 bool preview_stone(int x, int y) {
 	if (x < xfields && y < yfields && x >= 0 && y >= 0) {
-		if (!is_legal_move(x, y)) {
-			x = -1;
-			y = -1;
+		if (x != previewX || y != previewY) {
+			if (!is_legal_move(x, y)) {
+				x = -1;
+				y = -1;
+			}
 		}
 	} else {
 		x = -1;
@@ -322,12 +319,30 @@ bool preview_stone(int x, int y) {
 }
 
 bool is_legal_move(int x, int y) {
+	if (board[y][x])
+		return false;
+
+	bool isLegal = turnSequence.stonesPlayed.empty();
+
 	for (Move & move : turnSequence.stonesPlayed) {
-		board[move.y][move.x] = move.stoneColour;
+		if (x == move.x && y == move.y)
+			// Occupied by a pending stone
+			return false;
+		else if (adjacent(x, y, move.x, move.y))
+			isLegal = true;
 	}
 
-	bool isLegal = !place_stone(x, y, turnSequence.nextStoneColour, true);
+	if (!isLegal)
+		return false;
 
+	for (Move & move : turnSequence.stonesPlayed) {
+		board[move.y][move.x] = move.stoneColour + 1;
+	}
+	board[y][x] = turnSequence.nextStoneColour + 1;
+
+	isLegal = !place_stone(x, y, turnSequence.nextStoneColour, true);
+
+	board[y][x] = 0;
 	for (Move & move : turnSequence.stonesPlayed) {
 		board[move.y][move.x] = 0;
 	}
@@ -337,31 +352,50 @@ bool is_legal_move(int x, int y) {
 
 bool place_stone(int x, int y, int side, bool dryRun){
 	int nx, ny;
-	static int removedX = -1, removedY = -1;
-	//fprintf(stderr, "%d %d %d %d", removedX, removedY, x, y);
-	if (removedX == x && removedY == y) {
+	static int koX = -1, koY = -1;
+	if (koX == x && koY == y) {
 		return true;
 	}
+	int captures;
 	int hremove = 0;
-	bool cf;
+	bool hasLiberty;
+	bool capturedPendingStone = false;
+	bool capturedOwnGroup = false;
 	for (int i = 0; i < 4; i++) {
 		nx = x+(i==1)-(i==0);
 		ny = y+(i==3)-(i==2);
-		cf = check_liberties(nx, ny, 3-side);
-		hremove += !cf*handle_flags(!dryRun && !cf);
-		if (!dryRun && hremove == 1 && removedX == -1) {
-			removedX = nx;
-			removedY = ny;
+		if (nx >= 0 && nx < xfields && ny >= 0 && ny < yfields) {
+			hasLiberty = check_liberties(nx, ny, board[ny][nx]);
+			if (!hasLiberty && turnSequence.alternating)
+				capturedPendingStone |= captured_pending_stone();
+			captures = !hasLiberty * handle_flags(!dryRun && !hasLiberty && (board[ny][nx] & 3) != side + 1);
+			if (captures > 0) {
+				if (board[ny][nx] == side + 1) {
+					capturedOwnGroup = true;
+				}
+				else {
+					hremove += captures;
+					if (!dryRun && hremove == 1 && koX == -1) {
+						koX = nx;
+						koY = ny;
+					}
+				}
+			}
 		}
+
 	}
-	cf = check_liberties(x, y, side);
-	int tmp = handle_flags(!cf);
-	if (!dryRun && (tmp > 1 || hremove != 1)) {
-		removedX = -1;
-		removedY = -1;
+	if (!dryRun && hremove > 0) {
+		caps[side] += hremove;
+		display_caps();
 	}
-	//fprintf(stderr, " %d %d\n", tmp, hremove);
-	return !cf;
+	hasLiberty = check_liberties(x, y, board[y][x]);
+	int tmp = handle_flags(false);
+	if (!dryRun && (tmp > 1 || hremove != 1 || has_friendly_neighbour(x, y))) {
+		koX = -1;
+		koY = -1;
+	}
+
+	return capturedPendingStone || hremove == 0 && (!hasLiberty || capturedOwnGroup);
 }
 
 int handle_flags(bool removePiece){
@@ -379,6 +413,13 @@ int handle_flags(bool removePiece){
 		}
 	}
 	return r;
+}
+
+bool captured_pending_stone() {
+	for (Move & move : turnSequence.stonesPlayed)
+		if (board[move.y][move.x] & 4)
+			return true;
+	return false;
 }
 
 bool check_liberties(int x, int y, int side) {
@@ -403,4 +444,70 @@ bool check_liberties(int x, int y, int side) {
 	} else {
 		return false;
 	}
+}
+
+bool has_open_neighbour(int x, int y) {
+	int nx, ny;
+	for (int i = 0; i < 4; i++) {
+		nx = x + (i == 1) - (i == 0);
+		ny = y + (i == 3) - (i == 2);
+		if (nx < 0 || ny < 0 || nx >= xfields || ny >= yfields)
+			continue;
+		if (board[ny][nx] == 0)
+			return true;
+	}
+	return false;
+}
+
+bool has_friendly_neighbour(int x, int y) {
+	int nx, ny;
+	for (int i = 0; i < 4; i++) {
+		nx = x + (i == 1) - (i == 0);
+		ny = y + (i == 3) - (i == 2);
+		if (nx < 0 || ny < 0 || nx >= xfields || ny >= yfields)
+			continue;
+		if (board[ny][nx] == board[y][x])
+			return true;
+	}
+	return false;
+}
+
+bool adjacent(int x0, int y0, int x1, int y1) {
+	if (x0 == x1) {
+		int dY = y1 - y0;
+		if (dY == 1 || dY == -1)
+			return true;
+	}
+	else if (y0 == y1) {
+		int dX = x1 - x0;
+		if (dX == 1 || dX == -1)
+			return true;
+	}
+	return false;
+}
+
+
+void TurnSequence::instertStone(int x, int y) {
+	stonesPlayed.emplace_back(x, y, nextStoneColour);
+	if (alternating)
+		nextStoneColour = 1 - nextStoneColour;
+}
+
+void next_turn() {
+	turn = 1 - turn;
+	turnSequence.nextStoneColour = turn;
+	turnSequence.stonesPlayed.clear();
+	previewX = -1;
+	previewY = -1;
+}
+
+void reset_turn() {
+	turn = 1;
+	next_turn();
+}
+
+void display_caps() {
+	std::cout << "Caps:" << std::endl;
+	std::cout << "Black: " << caps[0] << std::endl;
+	std::cout << "White: " << caps[1] << std::endl << std::endl;
 }
