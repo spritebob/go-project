@@ -16,7 +16,7 @@ int main(int argc, char **argv) {
 	std::cout << "Play online (y/n)? ";
 	char c;
 	do {
-		c = getch();
+		c = tolower(getch());
 	} while (c != 'y' && c != 'n');
 	std::cout << c << std::endl;
 	if (c == 'n') argc = 0;

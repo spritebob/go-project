@@ -37,12 +37,14 @@ int previewX, previewY;
 Mesh mesh;
 TurnSequence turnSequence;
 
+void play_stones(std::vector<Move> & stones);
+void play_move(Move & move);
 bool place_stone(int x, int y, int side, bool dryRun = false);
 bool check_liberties(int x, int y, int side);
 int handle_flags(bool removePiece);
 bool captured_pending_stone();
 bool is_legal_move(int x, int y);
-bool has_open_neighbour(int x, int y);
+bool has_legal_adjacent_move(int x, int y);
 bool has_friendly_neighbour(int x, int y);
 bool adjacent(int x0, int y0, int x1, int y1);
 bool preview_stone(int x, int y);
@@ -192,6 +194,7 @@ void render_preview() {
 
 void game_display() {
 	glClear(GL_COLOR_BUFFER_BIT);
+
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
 	gluOrtho2D(-1,1,1,-1);
@@ -203,6 +206,7 @@ void game_display() {
 
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
+
 	draw_board();
 	render_preview();
 
@@ -232,6 +236,36 @@ void right_menu(int element) {
 
 }
 
+void play_stones(std::vector<Move> & stones) {
+	if (turnSequence.alternating && stones.size() > 1) {
+		for (Move & move : stones)
+			board[move.y][move.x] = move.stoneColour + 1;
+		bool surrounded = check_liberties(stones.back().x, stones.back().y, stones.back().stoneColour);
+		handle_flags(false);
+		for (Move & move : stones)
+			board[move.y][move.x] = 0;
+
+		if (surrounded) {
+			// Opponent stone is surrounded - put it on the board without capturing stones
+			auto it = stones.rbegin();
+			Move & move = *it++;
+			board[move.y][move.x] = move.stoneColour + 1;
+			play_move(*it);
+		} else {
+			for (auto it = stones.rbegin(); it != stones.rend(); ++it)
+				play_move(*it);
+		}
+	} else {
+		for (Move & move : stones)
+			play_move(move);
+	}
+}
+
+void play_move(Move & move) {
+	board[move.y][move.x] = move.stoneColour + 1;
+	place_stone(move.x, move.y, move.stoneColour);
+}
+
 void game_idle() {
 	if (!online)
 		return;
@@ -239,10 +273,7 @@ void game_idle() {
 	get_command(sock, &action);
 	switch (action.command) {
 		case CmdPut:
-			for (Move & move : action.moves) {
-				board[move.y][move.x] = move.stoneColour + 1;
-				place_stone(move.x, move.y, move.stoneColour);
-			}
+			play_stones(action.moves);
 			next_turn();
 			glutPostRedisplay();
 			break;
@@ -274,13 +305,10 @@ void game_mouse(int b, int z, int x, int y) {
 				turnSequence.instertStone(iX, iY);
 				previewX = -1;
 				previewY = -1;
-				if (turnSequence.stonesPlayed.size() < turnSequence.stonesToPlay && has_open_neighbour(iX, iY))
+				if (turnSequence.stonesPlayed.size() < turnSequence.stonesToPlay && has_legal_adjacent_move(iX, iY))
 					break;
 
-				for (Move & move : turnSequence.stonesPlayed) {
-					board[move.y][move.x] = move.stoneColour + 1;
-					place_stone(move.x, move.y, move.stoneColour);
-				}
+				play_stones(turnSequence.stonesPlayed);
 
 				if (online) {
 					sPlayerAction action;
@@ -365,7 +393,12 @@ bool is_legal_move(int x, int y) {
 	}
 	board[y][x] = turnSequence.nextStoneColour + 1;
 
-	isLegal = !place_stone(x, y, turnSequence.nextStoneColour, true);
+	if (turnSequence.alternating && !turnSequence.stonesPlayed.empty()) {
+		Move & move = turnSequence.stonesPlayed.front();
+		isLegal = !place_stone(move.x, move.y, move.stoneColour, true);
+	} else {
+		isLegal = !place_stone(x, y, turnSequence.nextStoneColour, true);
+	}
 
 	board[y][x] = 0;
 	for (Move & move : turnSequence.stonesPlayed) {
@@ -383,27 +416,19 @@ bool place_stone(int x, int y, int side, bool dryRun){
 	}
 	int captures;
 	int hremove = 0;
-	bool hasLiberty;
-	bool capturedPendingStone = false;
-	bool capturedOwnGroup = false;
+	bool hasLiberty, capturedOpponent;
 	for (int i = 0; i < 4; i++) {
 		nx = x+(i==1)-(i==0);
 		ny = y+(i==3)-(i==2);
 		if (nx >= 0 && nx < xfields && ny >= 0 && ny < yfields) {
 			hasLiberty = check_liberties(nx, ny, board[ny][nx]);
-			if (!hasLiberty && turnSequence.alternating)
-				capturedPendingStone |= captured_pending_stone();
-			captures = !hasLiberty * handle_flags(!dryRun && !hasLiberty && (board[ny][nx] & 3) != side + 1);
+			capturedOpponent = !hasLiberty && (board[ny][nx] & 3) != side + 1;
+			captures = capturedOpponent * handle_flags(!dryRun && capturedOpponent);
 			if (captures > 0) {
-				if (board[ny][nx] == side + 1) {
-					capturedOwnGroup = true;
-				}
-				else {
-					hremove += captures;
-					if (!dryRun && hremove == 1 && koX == -1) {
-						koX = nx;
-						koY = ny;
-					}
+				hremove += captures;
+				if (!dryRun && hremove == 1 && koX == -1) {
+					koX = nx;
+					koY = ny;
 				}
 			}
 		}
@@ -414,13 +439,15 @@ bool place_stone(int x, int y, int side, bool dryRun){
 		display_caps();
 	}
 	hasLiberty = check_liberties(x, y, board[y][x]);
+	if (!hasLiberty)
+		x = x;
 	int tmp = handle_flags(false);
 	if (!dryRun && (tmp > 1 || hremove != 1 || has_friendly_neighbour(x, y))) {
 		koX = -1;
 		koY = -1;
 	}
 
-	return capturedPendingStone || hremove == 0 && (!hasLiberty || capturedOwnGroup);
+	return hremove == 0 && !hasLiberty;
 }
 
 int handle_flags(bool removePiece){
@@ -471,14 +498,14 @@ bool check_liberties(int x, int y, int side) {
 	}
 }
 
-bool has_open_neighbour(int x, int y) {
+bool has_legal_adjacent_move(int x, int y) {
 	int nx, ny;
 	for (int i = 0; i < 4; i++) {
 		nx = x + (i == 1) - (i == 0);
 		ny = y + (i == 3) - (i == 2);
 		if (nx < 0 || ny < 0 || nx >= xfields || ny >= yfields)
 			continue;
-		if (board[ny][nx] == 0)
+		if (is_legal_move(nx, ny))
 			return true;
 	}
 	return false;
