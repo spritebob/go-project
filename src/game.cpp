@@ -72,35 +72,39 @@ void draw_board() {
 
 	int delta, orig;
 	int mask = 0;
-	double w;
 	if (xfields == 19) {
 		orig = 3;
 		delta = 6;
-		w = STARW;
+		glPointSize(5);
 	} else if (xfields == 13) {
 		orig = 3;
 		delta = 3;
 		mask = 1;
-		w = STARW;
+		glPointSize(5);
 	} else {
 		orig = 2;
 		delta = 4;
-		w = STARW * 1.5;
+		glPointSize(7);
 	}
+
+	glBegin(GL_POINTS);
+	glColor3f(lineColour.r, lineColour.g, lineColour.b);
 
 	for (int x = orig; x < xfields - 1; x += delta) {
 		for (int y = orig; y < xfields - 1; y += delta) {
 			if (((x + y) & mask) == 0)
-				glRectangle(lineColour, -0.9-w+x*dx, -0.9-w+y*dy, -0.9+w+x*dx, -0.9+w+y*dy);
+				glVertex3f(-0.9+x*dx, -0.9+y*dy, 0);
 		}
 	}
+	glEnd();
 }
 
 void game_init (int argc, std::string argv[])
 {
+	xfields = yfields = 9;
+
 	mainmenu = glutCreateMenu(right_menu);
 	player = turn = 0;
-	xfields = yfields = 9;
 	dx = 1.8/(xfields-1);
 	dy = 1.8/(yfields-1);
 
