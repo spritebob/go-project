@@ -240,7 +240,7 @@ void play_stones(std::vector<Move> & stones) {
 	if (turnSequence.alternating && stones.size() > 1) {
 		for (Move & move : stones)
 			board[move.y][move.x] = move.stoneColour + 1;
-		bool surrounded = check_liberties(stones.back().x, stones.back().y, stones.back().stoneColour);
+		bool surrounded = !check_liberties(stones.back().x, stones.back().y, stones.back().stoneColour + 1);
 		handle_flags(false);
 		for (Move & move : stones)
 			board[move.y][move.x] = 0;
