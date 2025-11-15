@@ -426,7 +426,7 @@ bool place_stone(int x, int y, int side, bool dryRun){
 			captures = capturedOpponent * handle_flags(!dryRun && capturedOpponent);
 			if (captures > 0) {
 				hremove += captures;
-				if (!dryRun && hremove == 1 && koX == -1) {
+				if (!dryRun && captures == 1) {
 					koX = nx;
 					koY = ny;
 				}
